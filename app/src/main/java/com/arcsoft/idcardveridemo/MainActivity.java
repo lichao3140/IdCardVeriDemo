@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
 
     @Override
     protected void onDestroy() {
-        //反初始化
+        // 反初始化，销毁引擎
         IdCardVerifyManager.getInstance().unInit();
         if (camera != null) {
             camera.release();
@@ -84,6 +84,8 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         //身份证数据高
         int height = 0;
 
+        // 输入身份证图片进行人脸检测
+        // data: 身份证图像数据,支持NV21 格式
         DetectFaceResult result = IdCardVerifyManager.getInstance().inputIdCardData(nv21Data, width, height);
         Log.d(TAG, "inputIdCardData result: " + result.getErrCode());
         if(result.getErrCode() == IdCardVerifyError.OK) {
@@ -100,6 +102,9 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         //图片数据高
         int height = 0;
 
+        //输入视频或图片数据进行人脸检测（现场采集照检测）
+        //视频为 true ，如果为图片最后参数设置为 false
+        // data : 图像数级，NV21 格式
         DetectFaceResult result = IdCardVerifyManager.getInstance().onPreviewData(nv21Data, width, height, false);
         Log.d(TAG, "onPreviewData image result: " + result.getErrCode());
         if(result.getErrCode() == IdCardVerifyError.OK) {
@@ -108,10 +113,15 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
         }
     }
 
+    /**
+     * 对比
+     */
     private void compare() {
         if(!isCurrentReady || !isIdCardReady) {
             return;
         }
+
+        // 检测到人脸后进行人证特征比对
         CompareResult compareResult = IdCardVerifyManager.getInstance().compareFeature(THRESHOLD);
         Log.d(TAG, "compareFeature: result " + compareResult.getResult() + ", isSuccess "
                 + compareResult.isSuccess() + ", errCode " + compareResult.getErrCode());
