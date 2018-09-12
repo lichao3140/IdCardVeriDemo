@@ -1,11 +1,16 @@
 package com.arcsoft.idcardveridemo;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.hardware.Camera;
+import android.hardware.usb.UsbManager;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
@@ -14,6 +19,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
 
 import com.arcsoft.idcardveri.CompareResult;
 import com.arcsoft.idcardveri.DetectFaceResult;
@@ -40,30 +46,47 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
     private static final int MAX_RETRY_TIME = 2;
     private int tryTime = 0;
 
+    // USB加密狗
+    private UsbManager mUsbManager;
+    com.SoftKey.SoftKey ytsoftkey;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        //初始化
-        int initResult = IdCardVerifyManager.getInstance().init(APP_ID, SDK_KEY);
-        Log.d(TAG, "init result: " + initResult);
 
-        surfaceView = findViewById(R.id.surfaceView);
-        SurfaceHolder surfaceholder = surfaceView.getHolder();
-        surfaceholder.addCallback(this);
-        surfaceRect = findViewById(R.id.surfaceview_rect);
-        surfaceRect.setZOrderMediaOverlay(true);
-        surfaceRect.getHolder().setFormat(PixelFormat.TRANSLUCENT);
-        Button btnIdCard = findViewById(R.id.btn_idcard);
-        btnIdCard.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //输入身份证数据
-                inputIdCard();
-            }
-        });
+        mUsbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
+        ytsoftkey=new  com.SoftKey.SoftKey(mUsbManager);
 
+        //这个用于判断系统中是否存在着加密锁。
+        ytsoftkey.FindPort(0);
+        if(ytsoftkey.get_LastError()!=0) {
+            ShowMessage("未找到加密锁,请插入加密锁后，再进行操作。");
+        } else {
+            //初始化
+            int initResult = IdCardVerifyManager.getInstance().init(APP_ID, SDK_KEY);
+            Log.d(TAG, "init result: " + initResult);
+
+            surfaceView = findViewById(R.id.surfaceView);
+            SurfaceHolder surfaceholder = surfaceView.getHolder();
+            surfaceholder.addCallback(this);
+            surfaceRect = findViewById(R.id.surfaceview_rect);
+            surfaceRect.setZOrderMediaOverlay(true);
+            surfaceRect.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+            Button btnIdCard = findViewById(R.id.btn_idcard);
+            btnIdCard.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    //输入身份证数据
+                    inputIdCard();
+                }
+            });
+        }
+
+        // 注册事件通知，以便能检测到硬件拨出消息
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        registerReceiver(mUsbReceiver, filter);
     }
 
     @Override
@@ -207,5 +230,24 @@ public class MainActivity extends AppCompatActivity implements SurfaceHolder.Cal
             }
         }
         return bestSize;
+    }
+
+    BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+
+                if (ytsoftkey.CheckKeyByEncstring()!=0) {
+                    ShowMessage("加密锁被拨出。");
+                    finish();
+                }
+
+            }
+        }
+    };
+
+    private void ShowMessage(String info) {
+        Toast.makeText(this,info, Toast.LENGTH_LONG).show();
     }
 }
